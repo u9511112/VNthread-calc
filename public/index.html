@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>牙板報價計算器</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     
     <style>
@@ -49,23 +48,10 @@
         .quote-info-box label { color: #2e7d32; font-size: 0.9rem; }
         .quote-title { font-weight: bold; font-size: 1.1rem; color: #1b5e20; margin-bottom: 15px; text-align: center; border-bottom: 2px solid #a5d6a7; padding-bottom: 10px; }
         
-        .export-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn-export { width: 100%; color: white; font-weight: bold; padding: 14px; border: none; border-radius: 10px; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s; }
+        .btn-export { width: 100%; color: white; font-weight: bold; padding: 16px; border: none; border-radius: 10px; cursor: pointer; font-size: 1.1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s; margin-top: 15px; background-color: #27ae60; }
         .btn-export:active { transform: scale(0.98); }
-        .btn-excel { background-color: #27ae60; }
-        .btn-pdf { background-color: #e74c3c; }
 
         .copyright { text-align: center; margin-top: 30px; font-size: 0.8rem; color: #8e8e93; }
-
-        /* 隱藏的 PDF 渲染區域，確保 html2pdf 能正確抓到 DOM */
-        #pdf-render-area {
-            position: absolute;
-            top: -10000px;
-            left: -10000px;
-            width: 800px; /* 固定 A4 寬度比例 */
-            background: white;
-            z-index: -1;
-        }
     </style>
 </head>
 <body>
@@ -161,21 +147,16 @@
         <div class="quote-info-box">
             <div class="quote-title" id="t_quote_title">📄 報價單客戶資訊 (Quotation Info)</div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div class="form-group"><label id="t_quote_to">客戶名稱 (To)</label><input type="text" id="cust_name" placeholder="联合公司"></div>
-                <div class="form-group"><label id="t_quote_attn">聯絡人 (Attn)</label><input type="text" id="cust_attn" placeholder="陈先生"></div>
+                <div class="form-group"><label id="t_quote_to">客戶名稱 (To)</label><input type="text" id="cust_name" placeholder="聯合公司"></div>
+                <div class="form-group"><label id="t_quote_attn">聯絡人 (Attn)</label><input type="text" id="cust_attn" placeholder="陳先生"></div>
                 <div class="form-group"><label id="t_quote_tel">電話 (Tel)</label><input type="text" id="cust_tel" placeholder="0868 549 896"></div>
                 <div class="form-group"><label id="t_quote_qty">數量 (Qty)</label><input type="number" id="qty" value="1" min="1"></div>
             </div>
-            <div class="export-btns">
-                <button class="btn-export btn-excel" onclick="exportExcel()">⬇️ 匯出 Excel</button>
-                <button class="btn-export btn-pdf" onclick="exportPDF()">⬇️ 匯出 PDF</button>
-            </div>
+            <button class="btn-export" onclick="exportExcel()">⬇️ 匯出 Excel 報價單</button>
         </div>
 
         <div class="copyright">© 謝智翔 u9511112@gmail.com</div>
     </div>
-
-    <div id="pdf-render-area"></div>
 
     <script>
         const i18n = {
@@ -380,34 +361,66 @@
                 if (typeof XLSX === 'undefined') { alert("Excel套件尚未載入，請稍後再試。"); return; }
                 const quote = getQuoteDetails(); if (!quote) return;
 
+                // 精準建構包含 JP 商標與底部條款的陣列結構
                 const ws_data = [
-                    ["精斌責任有限公司"],
-                    ["CÔNG TY TNHH HỢP KIM BƯỚC NHẢY"],
-                    ["                  Đ/C:  Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh"],
-                    ["Tel: 0274-3669503-4                  Fax : 0274 - 3557129"],
-                    [],
-                    ["To   : " + quote.custName],
-                    ["Attn : " + quote.custAttn],
-                    ["Tel   : " + quote.custTel],
-                    ["", "", "", "報價單"],
-                    ["", "", "", "BẢNG BÁO GIÁ"],
-                    ["", "", "", "", "", "", "", "日期/ngày tháng：" + quote.dateStr],
+                    ["JP 商標", "精斌責任有限公司", "", "", "", "", "", "", ""],
+                    ["", "CÔNG TY TNHH HỢP KIM BƯỚC NHẢY", "", "", "", "", "", "", ""],
+                    ["", "Đ/C:  Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh", "", "", "", "", "", "", ""],
+                    ["", "Tel: 0274-3669503-4                  Fax : 0274 - 3557129", "", "", "", "", "", "", ""],
+                    ["", "", "", "", "", "", "", "", ""],
+                    ["", "To   : " + quote.custName, "", "", "", "", "", "", ""],
+                    ["", "Attn : " + quote.custAttn, "", "", "", "", "", "", ""],
+                    ["", "Tel   : " + quote.custTel, "", "", "", "", "", "", ""],
+                    ["", "", "", "報價單", "", "", "", "", ""],
+                    ["", "", "", "BẢNG BÁO GIÁ", "", "", "", "", ""],
+                    ["", "", "", "", "", "", "", "日期/ngày tháng：" + quote.dateStr, ""],
                     ["STT\n序號", "Tên sản phẩm / Quy cách \n品名/尺寸", "", "Đvt\n單位", "Chất Liệu\n材質", "數量", `單價\n(${quote.currency})`, `金額\n(${quote.currency})`, "Ghi chú\n備註"],
-                    ["1.0", quote.specStr, "", "组", quote.material, quote.qty, quote.d.unitPrice, quote.d.unitPrice * quote.qty, quote.d.logs.join('\n')]
+                    [1.0, quote.specStr, "", "组", quote.material, quote.qty, quote.d.unitPrice, quote.d.unitPrice * quote.qty, quote.d.logs.join('\n')],
+                    ["", "", "", "", "", "", "", "", ""],
+                    // 底部條款開始
+                    ["", "1. Đơn giá trên chưa bao gồm thuế VAT.", "", "", "", "", "", "", ""],
+                    ["", "   以上的價格不含稅。", "", "", "", "", "", "", ""],
+                    ["", "2. Phương Thức thanh toán.", "", "", "", "", "", "", ""],
+                    ["", "   付款方式。", "", "", "", "", "", "", ""],
+                    ["", "   （ ）照买卖合同", "", "（ ）银行汇款", "", "", "（ ）现金", "", ""],
+                    ["", "   Theo hợp dồng kinh tế", "", "chuyển khoản", "", "", "tiền mặt", "", ""],
+                    ["", "", "", "", "", "", "", "", ""],
+                    ["", "Khách Hàng Xác Nhận", "", "", "", "CÔNG TY TNHH HỢP KIM BƯỚC NHẢY", "", "", ""],
+                    ["", "客戶確認", "", "", "", "精斌責任有限公司", "", "", ""]
                 ];
 
                 const ws = XLSX.utils.aoa_to_sheet(ws_data);
                 
                 // 儲存格合併設定
                 ws['!merges'] = [
+                    { s: {r: 0, c: 0}, e: {r: 3, c: 0} }, // A1:A4 合併為 JP商標 區域
+                    { s: {r: 0, c: 1}, e: {r: 0, c: 8} }, // 公司名稱
+                    { s: {r: 1, c: 1}, e: {r: 1, c: 8} }, 
+                    { s: {r: 2, c: 1}, e: {r: 2, c: 8} }, 
+                    { s: {r: 3, c: 1}, e: {r: 3, c: 8} }, 
+                    { s: {r: 5, c: 1}, e: {r: 5, c: 3} }, // To
+                    { s: {r: 6, c: 1}, e: {r: 6, c: 3} }, // Attn
+                    { s: {r: 7, c: 1}, e: {r: 7, c: 3} }, // Tel
                     { s: {r: 11, c: 1}, e: {r: 11, c: 2} }, // 表頭的品名欄合併 B12-C12
-                    { s: {r: 12, c: 1}, e: {r: 12, c: 2} }  // 資料的品名欄合併 B13-C13
+                    { s: {r: 12, c: 1}, e: {r: 12, c: 2} },  // 資料的品名欄合併 B13-C13
+                    // 底部簽名區塊合併
+                    { s: {r: 21, c: 1}, e: {r: 21, c: 3} }, // 客戶確認(越)
+                    { s: {r: 22, c: 1}, e: {r: 22, c: 3} }, // 客戶確認(中)
+                    { s: {r: 21, c: 5}, e: {r: 21, c: 8} }, // 公司簽名(越)
+                    { s: {r: 22, c: 5}, e: {r: 22, c: 8} }  // 公司簽名(中)
                 ];
                 
-                // 嚴格還原 CSV 欄位寬度
+                // 設定欄寬
                 ws['!cols'] = [
-                    {wch: 8}, {wch: 25}, {wch: 5}, {wch: 8}, {wch: 12}, 
-                    {wch: 8}, {wch: 15}, {wch: 15}, {wch: 35}
+                    {wch: 12}, // A (加寬給 JP 商標)
+                    {wch: 25}, // B
+                    {wch: 5},  // C
+                    {wch: 15}, // D (加寬給銀行匯款字眼)
+                    {wch: 12}, // E
+                    {wch: 8},  // F
+                    {wch: 15}, // G
+                    {wch: 15}, // H
+                    {wch: 35}  // I
                 ];
 
                 // 寫入樣式
@@ -416,93 +429,35 @@
                         const cellRef = XLSX.utils.encode_cell({r: i, c: j});
                         if (!ws[cellRef]) continue;
                         
-                        ws[cellRef].s = { font: { name: "Arial", sz: 11 } }; // 預設字體
+                        ws[cellRef].s = { font: { name: "Arial", sz: 11 } };
                         
-                        // 表格資料區塊加外框及置中
-                        if (i >= 11) {
+                        // 表格資料區塊加外框 (第12-13行)
+                        if (i === 11 || i === 12) {
                             ws[cellRef].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
                             ws[cellRef].s.alignment = { vertical: "center", horizontal: "center", wrapText: true };
                         }
                     }
                 }
                 
-                // 針對文字靠左
+                // 細節排版調整
+                if (ws['A1']) ws['A1'].s = { font: { name: "Arial", sz: 20, bold: true, color: { rgb: "0000FF" } }, alignment: { vertical: "center", horizontal: "center" } }; // JP商標樣式
+                if (ws['B1']) ws['B1'].s = { font: { name: "Arial", sz: 14, bold: true } };
+                if (ws['B2']) ws['B2'].s = { font: { name: "Arial", sz: 12, bold: true } };
+                if (ws['D9']) ws['D9'].s = { font: { name: "Arial", sz: 16, bold: true }, alignment: { horizontal: "center" } };
+                if (ws['D10']) ws['D10'].s = { font: { name: "Arial", sz: 14, bold: true }, alignment: { horizontal: "center" } };
                 if (ws['B13']) ws['B13'].s.alignment.horizontal = "left";
                 if (ws['I13']) ws['I13'].s.alignment.horizontal = "left";
-                
-                // 標題加粗
-                if (ws['A1']) ws['A1'].s = { font: { name: "Arial", sz: 14, bold: true } };
-                if (ws['D9']) ws['D9'].s = { font: { name: "Arial", sz: 16, bold: true }, alignment: { horizontal: "center" } };
+
+                // 底部簽名區塊置中對齊
+                if (ws['B22']) ws['B22'].s.alignment = { horizontal: "center" };
+                if (ws['B23']) ws['B23'].s.alignment = { horizontal: "center" };
+                if (ws['F22']) ws['F22'].s.alignment = { horizontal: "center" };
+                if (ws['F23']) ws['F23'].s.alignment = { horizontal: "center" };
 
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Báo Giá");
                 XLSX.writeFile(wb, `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.xlsx`);
             } catch (err) { alert("Excel 匯出發生錯誤: " + err.message); }
-        }
-
-        // ======================= PDF 匯出 =======================
-        function exportPDF() {
-            try {
-                if (typeof html2pdf === 'undefined') { alert("PDF套件尚未載入，請稍後再試。"); return; }
-                const quote = getQuoteDetails(); if (!quote) return;
-
-                // 將畫面寫入隱藏的實體 DOM 元素，確保排版完全被抓取
-                const renderArea = document.getElementById('pdf-render-area');
-                renderArea.innerHTML = `
-                    <div style="padding: 40px; font-family: 'Helvetica Neue', Arial, sans-serif; color: #000; line-height: 1.4;">
-                        <div style="font-size: 18px; font-weight: bold;">精斌責任有限公司</div>
-                        <div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">CÔNG TY TNHH HỢP KIM BƯỚC NHẢY</div>
-                        <div style="font-size: 12px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Đ/C: Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh</div>
-                        <div style="font-size: 12px; margin-bottom: 20px;">Tel: 0274-3669503-4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Fax : 0274 - 3557129</div>
-                        
-                        <div style="font-size: 14px; margin-bottom: 2px;">To &nbsp;&nbsp;&nbsp;: ${quote.custName}</div>
-                        <div style="font-size: 14px; margin-bottom: 2px;">Attn &nbsp;: ${quote.custAttn}</div>
-                        <div style="font-size: 14px; margin-bottom: 20px;">Tel &nbsp;&nbsp;&nbsp;: ${quote.custTel}</div>
-
-                        <div style="text-align: center; font-size: 18px; font-weight: bold; letter-spacing: 2px;">報價單</div>
-                        <div style="text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px;">BẢNG BÁO GIÁ</div>
-                        
-                        <div style="text-align: right; font-size: 12px; margin-bottom: 5px;">日期/ngày tháng：${quote.dateStr}</div>
-                        
-                        <table border="1" style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: center;">
-                            <thead style="background: #fff; font-weight: bold;">
-                                <tr>
-                                    <th style="padding: 8px; width: 6%;">STT<br>序號</th>
-                                    <th style="padding: 8px; width: 30%;">Tên sản phẩm / Quy cách<br>品名/尺寸</th>
-                                    <th style="padding: 8px; width: 8%;">Đvt<br>單位</th>
-                                    <th style="padding: 8px; width: 10%;">Chất Liệu<br>材質</th>
-                                    <th style="padding: 8px; width: 8%;">數量</th>
-                                    <th style="padding: 8px; width: 12%;">單價<br>(${quote.currency})</th>
-                                    <th style="padding: 8px; width: 12%;">金額<br>(${quote.currency})</th>
-                                    <th style="padding: 8px; width: 20%;">Ghi chú<br>備註</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td style="padding: 8px;">1.0</td>
-                                    <td style="padding: 8px; text-align: left; white-space: pre-wrap;">${quote.specStr}</td>
-                                    <td style="padding: 8px;">组</td>
-                                    <td style="padding: 8px;">${quote.material}</td>
-                                    <td style="padding: 8px;">${quote.qty}</td>
-                                    <td style="padding: 8px;">${quote.d.unitPrice.toLocaleString()}</td>
-                                    <td style="padding: 8px;">${(quote.d.unitPrice * quote.qty).toLocaleString()}</td>
-                                    <td style="padding: 8px; text-align: left; white-space: pre-wrap; font-size: 11px;">${quote.d.logs.join('\n')}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-
-                // 產生 PDF 
-                html2pdf().from(renderArea).set({
-                    margin: 10,
-                    filename: `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.pdf`,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2 },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                }).save();
-
-            } catch (err) { alert("PDF 匯出發生錯誤: " + err.message); }
         }
 
         initApp();
