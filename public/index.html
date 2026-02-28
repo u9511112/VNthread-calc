@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>牙板報價計算器</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; background-color: #f2f2f7; padding: 15px; padding-bottom: 100px; color: #333; margin: 0; }
+        .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        h2 { text-align: center; color: #333; margin-bottom: 15px; font-weight: 700; }
+        
+        /* 頂部控制列 (語言與幣別) */
+        .top-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .top-controls select { padding: 10px; font-size: 15px; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #ccc; }
+
+        .auth-group { background: #e1f5fe; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #b3e5fc; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: #555; }
+        select, input[type="number"], input[type="password"] { width: 100%; padding: 14px; border: 1px solid #d1d1d6; border-radius: 10px; font-size: 16px; background-color: #fff; box-sizing: border-box; appearance: none; -webkit-appearance: none; }
+        select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
+        input:focus, select:focus { border-color: #007aff; outline: none; }
+        
+        .var-section { background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 15px; }
+        .var-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .var-input { width: 80px !important; padding: 8px !important; text-align: center; color: #d35400; font-weight: bold; }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 15px; }
+        .check-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; padding: 2px; }
+        .check-item input { width: 20px; height: 20px; accent-color: #007aff; }
+        
+        .btn-calc { width: 100%; background-color: #007aff; color: white; font-size: 1.2rem; font-weight: bold; padding: 16px; border: none; border-radius: 12px; margin-top: 25px; box-shadow: 0 4px 10px rgba(0, 122, 255, 0.3); cursor: pointer; }
+        .btn-calc:active { transform: scale(0.98); background-color: #0062cc; }
+        
+        .result-box { background: #1c1c1e; color: white; padding: 25px; border-radius: 15px; margin-top: 25px; text-align: center; }
+        .price-container { display: flex; justify-content: center; align-items: baseline; gap: 5px; }
+        .price-val { font-size: 2.5rem; font-weight: 800; color: #30d158; line-height: 1.2; }
+        .currency-unit { font-size: 1.2rem; color: #8e8e93; font-weight: 600; }
+        #result-log { font-size: 0.85rem; margin-top: 15px; color: #aaa; text-align: left; white-space: pre-line; line-height: 1.5; border-top: 1px solid #333; padding-top: 15px; }
+        .error-msg { background: #ffebee; color: #c62828; padding: 12px; border-radius: 8px; margin-top: 15px; display: none; font-weight: bold; text-align: center; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2 id="t_title">搓牙板計算器</h2>
+
+        <div class="top-controls">
+            <select id="lang" onchange="changeLanguage()">
+                <option value="zh">🇹🇼 中文 (繁體)</option>
+                <option value="vi">🇻🇳 Tiếng Việt</option>
+                <option value="en">🇺🇸 English</option>
+            </select>
+            <select id="currency" onchange="changeCurrency()">
+                <option value="TWD">NT$ 台幣 (TWD)</option>
+                <option value="VND">₫ 越盾 (VND)</option>
+                <option value="USD">$ 美金 (USD)</option>
+            </select>
+        </div>
+
+        <div class="form-group auth-group">
+            <label id="t_auth" style="color: #0277bd;">🔑 系統授權碼 (Auth Code)</label>
+            <input type="password" id="auth_token" placeholder="請輸入授權碼" style="border: 1px solid #0288d1;">
+        </div>
+
+        <div class="form-group">
+            <label id="t_thick">1. 選擇厚度 (Thickness)</label>
+            <select id="sel_thick" onchange="populateSpecs()"></select>
+        </div>
+
+        <div class="form-group">
+            <label id="t_spec">2. 選擇長度 (固定 / 移動)</label>
+            <select id="sel_spec" onchange="clearResult()"></select>
+        </div>
+
+        <div class="form-group">
+            <label id="t_height">3. 輸入高度 (Height)</label>
+            <input type="number" id="in_height" inputmode="decimal">
+        </div>
+
+        <div class="form-group">
+            <label id="t_type">4. 類別 (Type)</label>
+            <select id="type">
+                <option value="TB" id="t_type_tb">機械牙板 (Machine / T-B)</option>
+                <option value="Pointed" id="t_type_pt">尖尾牙板 (Pointed Tail)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label id="t_discount" style="color:#ff3b30;">5. 折扣 (Discount)</label>
+            <select id="discount"></select>
+        </div>
+
+        <div class="form-group" id="wire-fee-box" style="padding:10px; border:1px dashed #999; border-radius:8px;">
+            <label id="t_wire">線割費 (Wire Cut)</label>
+            <select id="wire">
+                <option value="0" id="t_wire_none">無 (None)</option>
+                <option value="70000">JP 牙板 70,000 VND</option>
+                <option value="140000">非 JP 140,000 VND</option>
+            </select>
+        </div>
+
+        <div class="var-section">
+            <div class="var-row">
+                <label class="check-item"><input type="checkbox" id="opt_skh9" onchange="toggleInput('val_skh9')"> <span id="t_opt_skh9">SKH-9 (高速鋼)</span></label>
+                <div style="display:flex; align-items:center; gap:5px; color:#777; font-size:0.9rem;">
+                    x <input type="number" id="val_skh9" class="var-input" value="1.8" step="0.1" disabled>
+                </div>
+            </div>
+            <div class="var-row">
+                <label class="check-item"><input type="checkbox" id="opt_refurbish" onchange="toggleInput('val_refurbish')"> <span id="t_opt_ref">翻修品 (Refurbish)</span></label>
+                <div style="display:flex; align-items:center; gap:5px; color:#777; font-size:0.9rem;">
+                    x <input type="number" id="val_refurbish" class="var-input" value="0.6" step="0.1" disabled>
+                </div>
+            </div>
+        </div>
+
+        <div class="options-grid">
+            <label class="check-item"><input type="checkbox" id="opt_deepen20"> <span id="t_o1">機牙加深 (+20%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_triangle"> <span id="t_o2">三角牙/反入口 (+30%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_special50"> <span id="t_o3">特殊牙型 (+50%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_pitch04"> <span id="t_o4">牙距0.4以下 (+15%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_shapeX2"> <span id="t_o5">角/方牙 (x2)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_twoSpecs"> <span id="t_o6">雙規格 (+30%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_doubleLeft"> <span id="t_o7">雙牙/左牙 (+10%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_angle3048"> <span id="t_o8">牙山30-48度 (+10%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_4faces"> <span id="t_o9">四面用 (+50%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_surface"> <span id="t_o10">表面處理 (+15%)</span></label>
+            <label class="check-item"><input type="checkbox" id="opt_straight42"> <span id="t_o11">直齒42牙+ (+30%)</span></label>
+        </div>
+
+        <button class="btn-calc" onclick="calculate()" id="t_btn">連線計算 (Calculate)</button>
+        <div id="error-box" class="error-msg"></div>
+
+        <div class="result-box">
+            <div class="price-container">
+                <span class="price-val" id="final-price">0</span>
+                <span class="currency-unit" id="final-currency">TWD</span>
+            </div>
+            <div id="result-log"></div>
+        </div>
+    </div>
+
+    <script>
+        // 字典 (支援中文、越南文、英文)
+        const i18n = {
+            zh: {
+                title: "搓牙板計算器", auth: "🔑 系統授權碼", thick: "1. 選擇厚度", spec: "2. 選擇長度 (固定/移動)",
+                height: "3. 輸入高度", type: "4. 類別", discount: "5. 折扣", wire: "線割費",
+                type_tb: "機械牙板 (T-B)", type_pt: "尖尾牙板 (Pointed)", wire_none: "無",
+                opt_skh9: "SKH-9 (高速鋼)", opt_ref: "翻修品",
+                o1: "機牙加深 (+20%)", o2: "三角牙/反入口 (+30%)", o3: "特殊牙型 (+50%)", o4: "牙距0.4以下 (+15%)",
+                o5: "角/方牙 (x2)", o6: "雙規格 (+30%)", o7: "雙牙/左牙 (+10%)", o8: "牙山30-48度 (+10%)",
+                o9: "四面用 (+50%)", o10: "表面處理 (+15%)", o11: "直齒42牙+ (+30%)",
+                btn: "連線計算", placeholder_h: "例如: 30", msg_waiting: "等待輸入..."
+            },
+            vi: {
+                title: "Máy tính Bàn chà ren", auth: "🔑 Mã bản quyền", thick: "1. Chọn độ dày", spec: "2. Chọn chiều dài (Cố định/Di động)",
+                height: "3. Nhập chiều cao", type: "4. Loại", discount: "5. Chiết khấu", wire: "Phí cắt dây",
+                type_tb: "Bàn chà ren máy (T-B)", type_pt: "Bàn chà ren mũi nhọn", wire_none: "Không",
+                opt_skh9: "SKH-9 (Thép gió)", opt_ref: "Hàng phục hồi",
+                o1: "Ren sâu (+20%)", o2: "Ren tam giác (+30%)", o3: "Ren đặc biệt (+50%)", o4: "Bước ren < 0.4 (+15%)",
+                o5: "Ren vuông (x2)", o6: "Hai quy cách (+30%)", o7: "Ren trái/kép (+10%)", o8: "Góc 30-48 độ (+10%)",
+                o9: "Dùng 4 mặt (+50%)", o10: "Xử lý bề mặt (+15%)", o11: "Răng thẳng 42+ (+30%)",
+                btn: "Tính toán", placeholder_h: "VD: 30", msg_waiting: "Chờ nhập liệu..."
+            },
+            en: {
+                title: "Thread Rolling Die Calculator", auth: "🔑 Auth Code", thick: "1. Select Thickness", spec: "2. Select Length (Fixed/Moving)",
+                height: "3. Enter Height", type: "4. Type", discount: "5. Discount", wire: "Wire Cut Fee",
+                type_tb: "Machine Die (T-B)", type_pt: "Pointed Tail Die", wire_none: "None",
+                opt_skh9: "SKH-9 (High-Speed)", opt_ref: "Refurbished",
+                o1: "Deep Thread (+20%)", o2: "Triangle Thread (+30%)", o3: "Special Thread (+50%)", o4: "Pitch < 0.4 (+15%)",
+                o5: "Square Thread (x2)", o6: "Dual Specs (+30%)", o7: "Left/Double Thread (+10%)", o8: "Angle 30-48 (+10%)",
+                o9: "4-Face Use (+50%)", o10: "Surface Treat (+15%)", o11: "Straight 42+ (+30%)",
+                btn: "Calculate", placeholder_h: "e.g. 30", msg_waiting: "Waiting for input..."
+            }
+        };
+
+        const availableSpecs = [
+            "19.0_51.0_64.0", "20.0_65.0_80.0", "25.0_75.0_90.0", "25.0_90.0_105.0",
+            "25.0_100.0_115.0", "25.0_108.0_127.0", "25.0_127.0_140.0", "25.0_150.0_165.0",
+            "35.0_190.0_215.0", "38.0_230.0_265.0", "43.0_290.0_330.0", "50.0_290.0_330.0",
+            "50.0_380.0_420.0", "50.0_400.0_450.0"
+        ];
+
+        function initApp() {
+            changeLanguage();
+            changeCurrency();
+            populateDiscount();
+            populateThick();
+        }
+
+        function changeLanguage() {
+            const lang = document.getElementById('lang').value;
+            const text = i18n[lang];
+            
+            document.getElementById('t_title').innerText = text.title;
+            document.getElementById('t_auth').innerText = text.auth;
+            document.getElementById('t_thick').innerText = text.thick;
+            document.getElementById('t_spec').innerText = text.spec;
+            document.getElementById('t_height').innerText = text.height;
+            document.getElementById('t_type').innerText = text.type;
+            document.getElementById('t_discount').innerText = text.discount;
+            document.getElementById('t_wire').innerText = text.wire;
+            
+            document.getElementById('t_type_tb').innerText = text.type_tb;
+            document.getElementById('t_type_pt').innerText = text.type_pt;
+            document.getElementById('t_wire_none').innerText = text.wire_none;
+            
+            document.getElementById('t_opt_skh9').innerText = text.opt_skh9;
+            document.getElementById('t_opt_ref').innerText = text.opt_ref;
+            for(let i=1; i<=11; i++) { document.getElementById('t_o'+i).innerText = text['o'+i]; }
+            
+            document.getElementById('t_btn').innerText = text.btn;
+            document.getElementById('in_height').placeholder = text.placeholder_h;
+            if(document.getElementById('final-price').innerText === "0") {
+                document.getElementById('result-log').innerText = text.msg_waiting;
+            }
+        }
+
+        function changeCurrency() {
+            const cur = document.getElementById('currency').value;
+            document.getElementById('final-currency').innerText = cur;
+            
+            // 處理線割費選單的匯率換算
+            const wireSel = document.getElementById('wire');
+            if(cur === 'VND') {
+                wireSel.options[1].value = "116000"; wireSel.options[2].value = "231000";
+            } else if (cur === 'TWD' || cur === 'USD') {
+                // TWD 收費標準
+                wireSel.options[1].value = "170"; wireSel.options[2].value = "340";
+            }
+            clearResult();
+        }
+
+        function toggleInput(id) {
+            const checkbox = document.getElementById(id.replace('val', 'opt'));
+            document.getElementById(id).disabled = !checkbox.checked;
+        }
+
+        function populateDiscount() {
+            const sel = document.getElementById('discount');
+            sel.innerHTML = '<option value="10">無 (None)</option>';
+            for (let i = 99; i >= 50; i--) {
+                let val = (i / 10).toFixed(1);
+                sel.add(new Option(val.endsWith('.0') ? val.substring(0, val.length - 2) + "折" : val + "折", val));
+            }
+        }
+
+        function populateThick() {
+            const sel = document.getElementById('sel_thick');
+            sel.innerHTML = '<option value="">...</option>';
+            const thicks = new Set(availableSpecs.map(key => key.split('_')[0]));
+            Array.from(thicks).sort((a, b) => parseFloat(a) - parseFloat(b)).forEach(t => sel.add(new Option(t + " mm", t)));
+        }
+
+        function populateSpecs() {
+            const thick = document.getElementById('sel_thick').value;
+            const sel = document.getElementById('sel_spec');
+            sel.innerHTML = '<option value="">...</option>';
+            if (!thick) return;
+            availableSpecs.filter(k => k.startsWith(thick + "_")).forEach(key => {
+                const parts = key.split('_');
+                sel.add(new Option(`固定: ${parts[1]} / 移動: ${parts[2]}`, key));
+            });
+            clearResult();
+        }
+
+        function clearResult() {
+            document.getElementById('final-price').innerText = "0";
+            document.getElementById('result-log').innerText = i18n[document.getElementById('lang').value].msg_waiting;
+            document.getElementById('error-box').style.display = 'none';
+        }
+
+        async function calculate() {
+            const token = document.getElementById('auth_token').value;
+            const errorBox = document.getElementById('error-box');
+            const priceDisplay = document.getElementById('final-price');
+            const logArea = document.getElementById('result-log');
+            
+            const specKey = document.getElementById('sel_spec').value;
+            const hInput = document.getElementById('in_height').value;
+
+            if(!token) { errorBox.style.display = 'block'; errorBox.innerText = "⛔ 請輸入授權碼 (Auth Code)"; return; }
+            if (!specKey || !hInput) { errorBox.style.display = 'block'; errorBox.innerText = "請確認規格填寫完整"; return; }
+
+            const [t, f, m] = specKey.split('_').map(Number);
+            const currency = document.getElementById('currency').value;
+
+            // 美金的線割費計算，先以台幣計算再讓後端去除了32匯率
+            let wireVal = parseFloat(document.getElementById('wire').value) || 0;
+
+            const payload = {
+                t: t, h: parseFloat(hInput), f: f, m: m,
+                type: document.getElementById('type').value,
+                currency: currency,
+                wireFee: wireVal,
+                discount: parseFloat(document.getElementById('discount').value) || 0,
+                multipliers: {
+                    skh9: parseFloat(document.getElementById('val_skh9').value) || 1.8,
+                    refurbish: parseFloat(document.getElementById('val_refurbish').value) || 0.6
+                },
+                options: {
+                    skh9: document.getElementById('opt_skh9').checked,
+                    refurbish: document.getElementById('opt_refurbish').checked,
+                    shapeX2: document.getElementById('opt_shapeX2').checked,
+                    deepen20: document.getElementById('opt_deepen20').checked,
+                    reverseTri30: document.getElementById('opt_triangle').checked,
+                    complex50: document.getElementById('opt_special50').checked,
+                    pitch04: document.getElementById('opt_pitch04').checked,
+                    twoSpecs: document.getElementById('opt_twoSpecs').checked,
+                    doubleLeft: document.getElementById('opt_doubleLeft').checked,
+                    angle3048: document.getElementById('opt_angle3048').checked,
+                    faces4: document.getElementById('opt_4faces').checked,
+                    surface: document.getElementById('opt_surface').checked,
+                    straight42: document.getElementById('opt_straight42').checked
+                }
+            };
+
+            priceDisplay.innerText = "...";
+            errorBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': token },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+
+                if (result.success) {
+                    priceDisplay.innerText = result.finalPrice.toLocaleString();
+                    logArea.innerText = result.logs.join('\n');
+                } else {
+                    errorBox.style.display = 'block';
+                    errorBox.innerText = result.error;
+                    priceDisplay.innerText = "0";
+                }
+            } catch (error) {
+                errorBox.style.display = 'block';
+                errorBox.innerText = "無法連線至伺服器。 Server Error.";
+            }
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
