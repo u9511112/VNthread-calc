@@ -373,13 +373,15 @@
                     ["", "To   : " + quote.custName, "", "", "", "", "", "", ""],
                     ["", "Attn : " + quote.custAttn, "", "", "", "", "", "", ""],
                     ["", "Tel   : " + quote.custTel, "", "", "", "", "", "", ""],
-                    ["報價單", "", "", "", "", "", "", "", ""],
-                    ["BẢNG BÁO GIÁ", "", "", "", "", "", "", "", ""],
+                    ["報價單", "", "", "", "", "", "", "", ""], // 橫跨整列置中
+                    ["BẢNG BÁO GIÁ", "", "", "", "", "", "", "", ""], // 橫跨整列置中
                     ["", "", "", "", "", "", "", "日期/ngày tháng：" + quote.dateStr, ""],
                     ["STT\n序號", "Tên sản phẩm / Quy cách \n品名/尺寸", "", "Đvt\n單位", "Chất Liệu\n材質", "數量", `單價\n(${quote.currency})`, `金額\n(${quote.currency})`, "Ghi chú\n備註"],
-                    [1.0, quote.specStr, "", "组", quote.material, quote.qty, quote.d.unitPrice, quote.d.unitPrice * quote.qty, ""],
+                    // ✅ 備註欄位完全留白 ("") 不顯示計算 log
+                    [1.0, quote.specStr, "", "组", quote.material, quote.qty, quote.d.unitPrice, quote.d.unitPrice * quote.qty, ""], 
+                    // ✅ 新增的 Total 總價列
+                    ["Tổng cộng / 總計：", "", "", "", "", "", "", quote.d.unitPrice * quote.qty, ""], 
                     ["", "", "", "", "", "", "", "", ""],
-                    // 底部條款
                     ["", "1. Đơn giá trên chưa bao gồm thuế VAT.", "", "", "", "", "", "", ""],
                     ["", "   以上的價格不含稅。", "", "", "", "", "", "", ""],
                     ["", "2. Phương Thức thanh toán.", "", "", "", "", "", "", ""],
@@ -407,15 +409,25 @@
                     editAs: 'oneCell'
                 });
 
-                ws.getColumn(1).width = 12; // A
-                ws.getColumn(2).width = 25; // B
+                // ✅ 放大所有欄位的寬度
+                ws.getColumn(1).width = 14; // A
+                ws.getColumn(2).width = 30; // B
                 ws.getColumn(3).width = 5;  // C
-                ws.getColumn(4).width = 15; // D
-                ws.getColumn(5).width = 12; // E
-                ws.getColumn(6).width = 8;  // F
-                ws.getColumn(7).width = 15; // G
-                ws.getColumn(8).width = 15; // H
-                ws.getColumn(9).width = 35; // I
+                ws.getColumn(4).width = 18; // D
+                ws.getColumn(5).width = 16; // E
+                ws.getColumn(6).width = 12; // F
+                ws.getColumn(7).width = 20; // G
+                ws.getColumn(8).width = 20; // H
+                ws.getColumn(9).width = 40; // I
+
+                // ✅ 調整每列的行高，讓排版更大氣
+                ws.eachRow((row) => { row.height = 25; }); // 基礎高度
+                ws.getRow(1).height = 30; // 配合 JP 商標
+                ws.getRow(9).height = 35; // 報價單標題
+                ws.getRow(10).height = 35;
+                ws.getRow(12).height = 40; // 欄位表頭
+                ws.getRow(13).height = 80; // 品名與尺寸 (多行文字)
+                ws.getRow(14).height = 35; // Total 總計列
 
                 ws.mergeCells('B1:I1'); 
                 ws.mergeCells('B2:I2'); 
@@ -425,47 +437,61 @@
                 ws.mergeCells('B7:D7'); 
                 ws.mergeCells('B8:D8'); 
                 
-                // 👉 將報價單標題橫跨 A 到 I 欄合併，達成完美置中
+                // ✅ 將報價單標題橫跨 A 到 I 欄合併，達成完美置中
                 ws.mergeCells('A9:I9');
                 ws.mergeCells('A10:I10');
                 
                 ws.mergeCells('B12:C12'); 
                 ws.mergeCells('B13:C13'); 
+                ws.mergeCells('A14:G14'); // 將 Total 總計文字跨欄合併
                 
-                ws.mergeCells('B22:D22'); 
                 ws.mergeCells('B23:D23'); 
-                ws.mergeCells('F22:I22'); 
+                ws.mergeCells('B24:D24'); 
                 ws.mergeCells('F23:I23'); 
+                ws.mergeCells('F24:I24'); 
 
-                ws.eachRow((row, rowNumber) => {
+                // ✅ 放安全局字體大小至 12 (原本是 11)
+                ws.eachRow((row) => {
                     row.eachCell((cell) => {
-                        cell.font = { name: "Arial", size: 11 };
+                        cell.font = { name: "Arial", size: 12 };
                     });
                 });
 
+                // ✅ 為表頭、資料列、與總計列加上外框與置中
                 ['A12','B12','C12','D12','E12','F12','G12','H12','I12',
-                 'A13','B13','C13','D13','E13','F13','G13','H13','I13'].forEach(cellRef => {
+                 'A13','B13','C13','D13','E13','F13','G13','H13','I13',
+                 'A14','B14','C14','D14','E14','F14','G14','H14','I14'].forEach(cellRef => {
                     const cell = ws.getCell(cellRef);
                     cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
                     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
                 });
 
-                ws.getCell('B1').font = { name: "Arial", size: 14, bold: true };
-                ws.getCell('B2').font = { name: "Arial", size: 12, bold: true };
+                // ✅ 金額加上千分位逗號格式
+                const numFormat = quote.currency === 'USD' ? '#,##0.00' : '#,##0';
+                ws.getCell('G13').numFmt = numFormat;
+                ws.getCell('H13').numFmt = numFormat;
+                ws.getCell('H14').numFmt = numFormat;
+
+                ws.getCell('B1').font = { name: "Arial", size: 15, bold: true };
+                ws.getCell('B2').font = { name: "Arial", size: 13, bold: true };
                 
-                // 👉 設定置中的標題樣式
-                ws.getCell('A9').font = { name: "Arial", size: 16, bold: true };
-                ws.getCell('A9').alignment = { horizontal: "center" };
-                ws.getCell('A10').font = { name: "Arial", size: 14, bold: true };
-                ws.getCell('A10').alignment = { horizontal: "center" };
+                // ✅ 標題置中樣式
+                ws.getCell('A9').font = { name: "Arial", size: 18, bold: true };
+                ws.getCell('A9').alignment = { horizontal: "center", vertical: "middle" };
+                ws.getCell('A10').font = { name: "Arial", size: 16, bold: true };
+                ws.getCell('A10').alignment = { horizontal: "center", vertical: "middle" };
                 
+                // ✅ 品名備註靠左、Total 置右
                 ws.getCell('B13').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
                 ws.getCell('I13').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                ws.getCell('A14').alignment = { vertical: 'middle', horizontal: 'right', indent: 1 };
+                ws.getCell('A14').font = { name: "Arial", size: 13, bold: true };
+                ws.getCell('H14').font = { name: "Arial", size: 13, bold: true };
 
-                ws.getCell('B22').alignment = { horizontal: "center" };
                 ws.getCell('B23').alignment = { horizontal: "center" };
-                ws.getCell('F22').alignment = { horizontal: "center" };
+                ws.getCell('B24').alignment = { horizontal: "center" };
                 ws.getCell('F23').alignment = { horizontal: "center" };
+                ws.getCell('F24').alignment = { horizontal: "center" };
 
                 const buffer = await workbook.xlsx.writeBuffer();
                 saveAs(new Blob([buffer]), `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.xlsx`);
