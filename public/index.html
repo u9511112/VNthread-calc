@@ -6,13 +6,16 @@
     <title>牙板報價計算器</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; background-color: #f2f2f7; padding: 15px; padding-bottom: 100px; color: #333; margin: 0; }
-        .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
-        h2 { text-align: center; color: #333; margin-bottom: 15px; font-weight: 700; }
         
-        /* 頂部控制列 (語言與幣別) */
+        /* 增加 position: relative 讓右上角的到期日標籤能精準定位 */
+        .container { position: relative; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        h2 { text-align: center; color: #333; margin-bottom: 15px; font-weight: 700; margin-top: 5px; }
+        
+        /* 🌟 右上角到期日標籤樣式 */
+        #expiry-badge { position: absolute; top: 15px; right: 15px; font-size: 0.75rem; background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 12px; display: none; font-weight: bold; border: 1px solid #c8e6c9; }
+
         .top-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .top-controls select { padding: 10px; font-size: 15px; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #ccc; }
-
         .auth-group { background: #e1f5fe; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #b3e5fc; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: #555; }
@@ -41,6 +44,8 @@
 <body>
 
     <div class="container">
+        <div id="expiry-badge">⏳ 驗證中...</div>
+
         <h2 id="t_title">搓牙板計算器</h2>
 
         <div class="top-controls">
@@ -58,7 +63,7 @@
 
         <div class="form-group auth-group">
             <label id="t_auth" style="color: #0277bd;">🔑 系統授權碼 (Auth Code)</label>
-            <input type="password" id="auth_token" placeholder="請輸入授權碼" style="border: 1px solid #0288d1;">
+            <input type="password" id="auth_token" placeholder="VIP888" style="border: 1px solid #0288d1;">
         </div>
 
         <div class="form-group">
@@ -93,8 +98,8 @@
             <label id="t_wire">線割費 (Wire Cut)</label>
             <select id="wire">
                 <option value="0" id="t_wire_none">無 (None)</option>
-                <option value="70000">JP 牙板 70,000 VND</option>
-                <option value="140000">非 JP 140,000 VND</option>
+                <option value="116000">JP 牙板 (116,000 VND / 170 TWD)</option>
+                <option value="231000">非 JP (231,000 VND / 340 TWD)</option>
             </select>
         </div>
 
@@ -140,7 +145,6 @@
     </div>
 
     <script>
-        // 字典 (支援中文、越南文、英文)
         const i18n = {
             zh: {
                 title: "搓牙板計算器", auth: "🔑 系統授權碼", thick: "1. 選擇厚度", spec: "2. 選擇長度 (固定/移動)",
@@ -181,11 +185,42 @@
             "50.0_380.0_420.0", "50.0_400.0_450.0"
         ];
 
+        // 網頁啟動時執行的動作
         function initApp() {
             changeLanguage();
             changeCurrency();
             populateDiscount();
             populateThick();
+
+            // 🌟 讀取瀏覽器記憶的密碼
+            const savedToken = localStorage.getItem('threadCalcToken');
+            if (savedToken) {
+                document.getElementById('auth_token').value = savedToken;
+                verifyToken(savedToken); // 自動去後端查到期日
+            }
+        }
+
+        // 🌟 去後端驗證密碼與取得日期的函數
+        async function verifyToken(token) {
+            try {
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: { 'Authorization': token }
+                });
+                const result = await response.json();
+                const badge = document.getElementById('expiry-badge');
+                
+                if (result.success) {
+                    badge.style.display = 'block';
+                    badge.innerText = `⏳ 到期: ${result.expireDate}`;
+                } else {
+                    // 如果密碼過期或被管理員刪除，就把手機的記憶清空
+                    localStorage.removeItem('threadCalcToken');
+                    badge.style.display = 'none';
+                }
+            } catch (e) {
+                console.log("無法自動驗證授權碼狀態");
+            }
         }
 
         function changeLanguage() {
@@ -220,12 +255,10 @@
             const cur = document.getElementById('currency').value;
             document.getElementById('final-currency').innerText = cur;
             
-            // 處理線割費選單的匯率換算
             const wireSel = document.getElementById('wire');
             if(cur === 'VND') {
                 wireSel.options[1].value = "116000"; wireSel.options[2].value = "231000";
             } else if (cur === 'TWD' || cur === 'USD') {
-                // TWD 收費標準
                 wireSel.options[1].value = "170"; wireSel.options[2].value = "340";
             }
             clearResult();
@@ -284,8 +317,6 @@
 
             const [t, f, m] = specKey.split('_').map(Number);
             const currency = document.getElementById('currency').value;
-
-            // 美金的線割費計算，先以台幣計算再讓後端去除了32匯率
             let wireVal = parseFloat(document.getElementById('wire').value) || 0;
 
             const payload = {
@@ -330,6 +361,15 @@
                 if (result.success) {
                     priceDisplay.innerText = result.finalPrice.toLocaleString();
                     logArea.innerText = result.logs.join('\n');
+                    
+                    // 🌟 計算成功！代表密碼正確，將密碼存入手機記憶體中
+                    localStorage.setItem('threadCalcToken', token);
+                    
+                    // 同步更新右上角的標籤
+                    const badge = document.getElementById('expiry-badge');
+                    badge.style.display = 'block';
+                    badge.innerText = `⏳ 到期: ${result.expireDate}`;
+
                 } else {
                     errorBox.style.display = 'block';
                     errorBox.innerText = result.error;
