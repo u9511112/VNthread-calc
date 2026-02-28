@@ -41,14 +41,13 @@ const dbTWD = {
   "50.0_400.0_450.0": { "TB": { "80.0": 17000, "105.0": 19000, "130.0": 21000, "155.0": 25000, "180.0": 33000, "205.0": 40000, "205.0": 47000 } }
 };
 
+// 🔑 訂閱制：授權碼與到期日管理
 const validTokens = {
-    // 格式：'授權碼': '到期日 (YYYY-MM-DD)'
-    'VIP888': '2026-03-31',  // 假設這家公司繳費到 3 月底
-    'BOSS999': '2026-06-30', // 這家公司可能是一次繳半年
-    'TEST123': '2026-02-28', // 測試用帳號，可能今天就到期了
-    'JPCOMPANY': '2026-04-01' // 您可以隨時新增客戶
+    'VIP888': '2026-12-31',
+    'BOSS999': '2026-06-30'
 };
 
+// 🛡️ 檢查授權碼是否有效的防護機制
 function checkAuth(req, res, next) {
     const token = req.headers['authorization'];
     if (validTokens.hasOwnProperty(token)) {
@@ -65,9 +64,20 @@ function checkAuth(req, res, next) {
     }
 }
 
+// 🌟 新增：專門用來查「到期日」的 API
+app.post('/api/verify', (req, res) => {
+    const token = req.headers['authorization'];
+    if (validTokens.hasOwnProperty(token)) {
+        res.json({ success: true, expireDate: validTokens[token] });
+    } else {
+        res.json({ success: false });
+    }
+});
+
+// ⚙️ 計算 API
 app.post('/api/calculate', checkAuth, (req, res) => {
-    // 增加接收 currency (幣別) 和 wireFee (線割費)
     const { t, h, f, m, type, currency, wireFee, discount, multipliers, options } = req.body;
+    const token = req.headers['authorization']; 
     let logs = [];
     
     // 決定要用哪套資料庫 (美金用 TWD 資料庫去換算)
@@ -95,20 +105,22 @@ app.post('/api/calculate', checkAuth, (req, res) => {
     let total = typeData[matchH.toFixed(1)];
     logs.push(`基礎價格 (${key.replace(/_/g,'x')}, H=${matchH}): ${total.toLocaleString()} ${currency === 'USD' ? 'TWD(基底)' : currency}` + warning);
 
-    // 處理材質與翻修 (自訂倍率)
+    // 處理材質與翻修 (動態套用前端傳來的倍率)
     let multiplier = 1.0;
     if (options.skh9) { 
         const val = (multipliers && multipliers.skh9) ? multipliers.skh9 : 1.8;
-        multiplier *= val; logs.push(`材質 SKH-9 (x${val})`); 
+        multiplier *= val; 
+        logs.push(`材質 SKH-9 (x${val})`); 
     }
     if (options.refurbish) { 
         const val = (multipliers && multipliers.refurbish) ? multipliers.refurbish : 0.6;
-        multiplier *= val; logs.push(`翻修品 (x${val})`); 
+        multiplier *= val; 
+        logs.push(`翻修品 (x${val})`); 
     }
     if (options.shapeX2) { multiplier *= 2; logs.push("角牙/方牙 (x2)"); }
     total *= multiplier;
 
-    // 處理加成
+    // 處理固定加成
     let pct = 0;
     if (options.deepen20) { pct += 0.20; logs.push("機牙加深 (+20%)"); }
     if (options.reverseTri30) { pct += 0.30; logs.push("三角牙/反入口 (+30%)"); }
@@ -127,7 +139,7 @@ app.post('/api/calculate', checkAuth, (req, res) => {
         logs.push(`加成小計: +${Math.round(add).toLocaleString()}`);
     }
 
-    // 線割費 (依前端選擇加上去)
+    // 線割費
     if (wireFee && wireFee > 0) {
         total += wireFee;
         logs.push(`線割費: +${wireFee.toLocaleString()}`);
@@ -147,16 +159,23 @@ app.post('/api/calculate', checkAuth, (req, res) => {
         total = total * (discount / 10);
         let diff = oldTotal - total;
         
-        if(currency === 'USD') {
+        if (currency === 'USD') {
             logs.push(`折數 (${discount}折): -${diff.toFixed(2)}`);
         } else {
             logs.push(`折數 (${discount}折): -${Math.round(diff).toLocaleString()}`);
         }
     }
 
-    // 回傳 (美金保留小數點2位，其他取整數)
+    // 回傳結果
     const finalVal = (currency === 'USD') ? Number(total.toFixed(2)) : Math.round(total);
-    res.json({ success: true, finalPrice: finalVal, logs: logs });
+    
+    // 👉 把計算出來的價格跟「到期日」一起傳回前端
+    res.json({ 
+        success: true, 
+        finalPrice: finalVal, 
+        logs: logs,
+        expireDate: validTokens[token]
+    });
 });
 
 const PORT = process.env.PORT || 3000;
