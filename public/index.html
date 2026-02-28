@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>牙板報價計算器</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; background-color: #f2f2f7; padding: 15px; padding-bottom: 100px; color: #333; margin: 0; }
@@ -355,17 +356,20 @@
             };
         }
 
-        // ======================= EXCEL 匯出 =======================
-        function exportExcel() {
+        // ======================= 全新 ExcelJS 匯出引擎 (支援圖片) =======================
+        async function exportExcel() {
             try {
-                if (typeof XLSX === 'undefined') { alert("Excel套件尚未載入，請稍後再試。"); return; }
+                if (typeof ExcelJS === 'undefined') { alert("Excel套件尚未載入，請稍後再試。"); return; }
                 const quote = getQuoteDetails(); if (!quote) return;
 
-                // 精準建構包含 JP 商標與底部條款的陣列結構
+                const workbook = new ExcelJS.Workbook();
+                const ws = workbook.addWorksheet('Báo Giá');
+
+                // 資料陣列結構 (與您的 CSV 排版完全一致)
                 const ws_data = [
-                    ["JP 商標", "精斌責任有限公司", "", "", "", "", "", "", ""],
+                    ["", "精斌責任有限公司", "", "", "", "", "", "", ""],
                     ["", "CÔNG TY TNHH HỢP KIM BƯỚC NHẢY", "", "", "", "", "", "", ""],
-                    ["", "Đ/C:  Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh", "", "", "", "", "", "", ""],
+                    ["", "                  Đ/C:  Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh", "", "", "", "", "", "", ""],
                     ["", "Tel: 0274-3669503-4                  Fax : 0274 - 3557129", "", "", "", "", "", "", ""],
                     ["", "", "", "", "", "", "", "", ""],
                     ["", "To   : " + quote.custName, "", "", "", "", "", "", ""],
@@ -377,7 +381,7 @@
                     ["STT\n序號", "Tên sản phẩm / Quy cách \n品名/尺寸", "", "Đvt\n單位", "Chất Liệu\n材質", "數量", `單價\n(${quote.currency})`, `金額\n(${quote.currency})`, "Ghi chú\n備註"],
                     [1.0, quote.specStr, "", "组", quote.material, quote.qty, quote.d.unitPrice, quote.d.unitPrice * quote.qty, quote.d.logs.join('\n')],
                     ["", "", "", "", "", "", "", "", ""],
-                    // 底部條款開始
+                    // 底部條款
                     ["", "1. Đơn giá trên chưa bao gồm thuế VAT.", "", "", "", "", "", "", ""],
                     ["", "   以上的價格不含稅。", "", "", "", "", "", "", ""],
                     ["", "2. Phương Thức thanh toán.", "", "", "", "", "", "", ""],
@@ -389,75 +393,89 @@
                     ["", "客戶確認", "", "", "", "精斌責任有限公司", "", "", ""]
                 ];
 
-                const ws = XLSX.utils.aoa_to_sheet(ws_data);
-                
-                // 儲存格合併設定
-                ws['!merges'] = [
-                    { s: {r: 0, c: 0}, e: {r: 3, c: 0} }, // A1:A4 合併為 JP商標 區域
-                    { s: {r: 0, c: 1}, e: {r: 0, c: 8} }, // 公司名稱
-                    { s: {r: 1, c: 1}, e: {r: 1, c: 8} }, 
-                    { s: {r: 2, c: 1}, e: {r: 2, c: 8} }, 
-                    { s: {r: 3, c: 1}, e: {r: 3, c: 8} }, 
-                    { s: {r: 5, c: 1}, e: {r: 5, c: 3} }, // To
-                    { s: {r: 6, c: 1}, e: {r: 6, c: 3} }, // Attn
-                    { s: {r: 7, c: 1}, e: {r: 7, c: 3} }, // Tel
-                    { s: {r: 11, c: 1}, e: {r: 11, c: 2} }, // 表頭的品名欄合併 B12-C12
-                    { s: {r: 12, c: 1}, e: {r: 12, c: 2} },  // 資料的品名欄合併 B13-C13
-                    // 底部簽名區塊合併
-                    { s: {r: 21, c: 1}, e: {r: 21, c: 3} }, // 客戶確認(越)
-                    { s: {r: 22, c: 1}, e: {r: 22, c: 3} }, // 客戶確認(中)
-                    { s: {r: 21, c: 5}, e: {r: 21, c: 8} }, // 公司簽名(越)
-                    { s: {r: 22, c: 5}, e: {r: 22, c: 8} }  // 公司簽名(中)
-                ];
-                
-                // 設定欄寬
-                ws['!cols'] = [
-                    {wch: 12}, // A (加寬給 JP 商標)
-                    {wch: 25}, // B
-                    {wch: 5},  // C
-                    {wch: 15}, // D (加寬給銀行匯款字眼)
-                    {wch: 12}, // E
-                    {wch: 8},  // F
-                    {wch: 15}, // G
-                    {wch: 15}, // H
-                    {wch: 35}  // I
-                ];
+                // 將資料寫入工作表
+                ws_data.forEach(row => ws.addRow(row));
 
-                // 寫入樣式
-                for (let i = 0; i < ws_data.length; i++) {
-                    for (let j = 0; j < ws_data[i].length; j++) {
-                        const cellRef = XLSX.utils.encode_cell({r: i, c: j});
-                        if (!ws[cellRef]) continue;
-                        
-                        ws[cellRef].s = { font: { name: "Arial", sz: 11 } };
-                        
-                        // 表格資料區塊加外框 (第12-13行)
-                        if (i === 11 || i === 12) {
-                            ws[cellRef].s.border = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-                            ws[cellRef].s.alignment = { vertical: "center", horizontal: "center", wrapText: true };
-                        }
-                    }
-                }
+                // 👉 1. 插入 JP 商標圖片 (Base64)
+                // ⚠️ 請在這裡替換成您用工具轉換出來的 Base64 圖片編碼！
+                const logoBase64 = 'data:image/png;base64,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'; 
                 
+                const imageId = workbook.addImage({
+                    base64: logoBase64,
+                    extension: 'png',
+                });
+                
+                // 將圖片放在 A1 到 A4 區塊內
+                ws.addImage(imageId, {
+                    tl: { col: 0, row: 0 },
+                    br: { col: 1, row: 4 },
+                    editAs: 'oneCell'
+                });
+
+                // 👉 2. 設定欄寬
+                ws.getColumn(1).width = 12; // A
+                ws.getColumn(2).width = 25; // B
+                ws.getColumn(3).width = 5;  // C
+                ws.getColumn(4).width = 15; // D
+                ws.getColumn(5).width = 12; // E
+                ws.getColumn(6).width = 8;  // F
+                ws.getColumn(7).width = 15; // G
+                ws.getColumn(8).width = 15; // H
+                ws.getColumn(9).width = 35; // I
+
+                // 👉 3. 儲存格合併
+                ws.mergeCells('B1:I1'); // 公司名稱
+                ws.mergeCells('B2:I2'); 
+                ws.mergeCells('B3:I3'); 
+                ws.mergeCells('B4:I4'); 
+                ws.mergeCells('B6:D6'); // To
+                ws.mergeCells('B7:D7'); // Attn
+                ws.mergeCells('B8:D8'); // Tel
+                ws.mergeCells('B12:C12'); // 品名表頭
+                ws.mergeCells('B13:C13'); // 品名資料
+                
+                // 底部簽名區塊合併
+                ws.mergeCells('B22:D22'); 
+                ws.mergeCells('B23:D23'); 
+                ws.mergeCells('F22:I22'); 
+                ws.mergeCells('F23:I23'); 
+
+                // 👉 4. 樣式設定
+                ws.eachRow((row, rowNumber) => {
+                    row.eachCell((cell) => {
+                        cell.font = { name: "Arial", size: 11 };
+                    });
+                });
+
+                // 表格加外框與置中 (第12-13行)
+                ['A12','B12','C12','D12','E12','F12','G12','H12','I12',
+                 'A13','B13','C13','D13','E13','F13','G13','H13','I13'].forEach(cellRef => {
+                    const cell = ws.getCell(cellRef);
+                    cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                });
+
                 // 細節排版調整
-                if (ws['A1']) ws['A1'].s = { font: { name: "Arial", sz: 20, bold: true, color: { rgb: "0000FF" } }, alignment: { vertical: "center", horizontal: "center" } }; // JP商標樣式
-                if (ws['B1']) ws['B1'].s = { font: { name: "Arial", sz: 14, bold: true } };
-                if (ws['B2']) ws['B2'].s = { font: { name: "Arial", sz: 12, bold: true } };
-                if (ws['D9']) ws['D9'].s = { font: { name: "Arial", sz: 16, bold: true }, alignment: { horizontal: "center" } };
-                if (ws['D10']) ws['D10'].s = { font: { name: "Arial", sz: 14, bold: true }, alignment: { horizontal: "center" } };
-                if (ws['B13']) ws['B13'].s.alignment.horizontal = "left";
-                if (ws['I13']) ws['I13'].s.alignment.horizontal = "left";
+                ws.getCell('B1').font = { name: "Arial", size: 14, bold: true };
+                ws.getCell('B2').font = { name: "Arial", size: 12, bold: true };
+                ws.getCell('D9').font = { name: "Arial", size: 16, bold: true };
+                ws.getCell('D9').alignment = { horizontal: "center" };
+                ws.getCell('D10').font = { name: "Arial", size: 14, bold: true };
+                ws.getCell('D10').alignment = { horizontal: "center" };
+                
+                ws.getCell('B13').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                ws.getCell('I13').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
 
-                // 底部簽名區塊置中對齊
-                if (ws['B22']) ws['B22'].s.alignment = { horizontal: "center" };
-                if (ws['B23']) ws['B23'].s.alignment = { horizontal: "center" };
-                if (ws['F22']) ws['F22'].s.alignment = { horizontal: "center" };
-                if (ws['F23']) ws['F23'].s.alignment = { horizontal: "center" };
+                ws.getCell('B22').alignment = { horizontal: "center" };
+                ws.getCell('B23').alignment = { horizontal: "center" };
+                ws.getCell('F22').alignment = { horizontal: "center" };
+                ws.getCell('F23').alignment = { horizontal: "center" };
 
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Báo Giá");
-                XLSX.writeFile(wb, `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.xlsx`);
-            } catch (err) { alert("Excel 匯出發生錯誤: " + err.message); }
+                // 👉 5. 匯出檔案
+                const buffer = await workbook.xlsx.writeBuffer();
+                saveAs(new Blob([buffer]), `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.xlsx`);
+
+            } catch (err) { alert("Excel 匯出發生錯誤: " + err.message); console.error(err); }
         }
 
         initApp();
