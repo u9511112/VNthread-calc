@@ -4,28 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>牙板報價計算器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", Roboto, sans-serif; background-color: #f2f2f7; padding: 15px; padding-bottom: 100px; color: #333; margin: 0; }
-        
-        /* 增加 position: relative 讓右上角的到期日標籤能精準定位 */
-        .container { position: relative; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); }
+        .container { position: relative; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); max-width: 800px; margin: 0 auto; }
         h2 { text-align: center; color: #333; margin-bottom: 15px; font-weight: 700; margin-top: 5px; }
         
-        /* 🌟 右上角到期日標籤樣式 */
-        #expiry-badge { position: absolute; top: 15px; right: 15px; font-size: 0.75rem; background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 12px; display: none; font-weight: bold; border: 1px solid #c8e6c9; }
+        #expiry-badge { position: absolute; top: 15px; right: 15px; z-index: 99; font-size: 0.75rem; background: #e8f5e9; color: #2e7d32; padding: 4px 10px; border-radius: 12px; display: none; font-weight: bold; border: 1px solid #c8e6c9; }
 
         .top-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .top-controls select { padding: 10px; font-size: 15px; border-radius: 8px; background-color: #f8f9fa; border: 1px solid #ccc; }
+        
         .auth-group { background: #e1f5fe; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #b3e5fc; }
         .form-group { margin-bottom: 15px; }
+        .form-group.full-width { grid-column: 1 / -1; }
         label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.95rem; color: #555; }
-        select, input[type="number"], input[type="password"] { width: 100%; padding: 14px; border: 1px solid #d1d1d6; border-radius: 10px; font-size: 16px; background-color: #fff; box-sizing: border-box; appearance: none; -webkit-appearance: none; }
+        
+        select, input[type="number"], input[type="text"], input[type="password"] { width: 100%; padding: 14px; border: 1px solid #d1d1d6; border-radius: 10px; font-size: 16px; background-color: #fff; box-sizing: border-box; appearance: none; -webkit-appearance: none; }
         select { background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; }
         input:focus, select:focus { border-color: #007aff; outline: none; }
         
         .var-section { background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 15px; }
         .var-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
         .var-input { width: 80px !important; padding: 8px !important; text-align: center; color: #d35400; font-weight: bold; }
+        
         .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 15px; }
         .check-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; padding: 2px; }
         .check-item input { width: 20px; height: 20px; accent-color: #007aff; }
@@ -39,6 +42,18 @@
         .currency-unit { font-size: 1.2rem; color: #8e8e93; font-weight: 600; }
         #result-log { font-size: 0.85rem; margin-top: 15px; color: #aaa; text-align: left; white-space: pre-line; line-height: 1.5; border-top: 1px solid #333; padding-top: 15px; }
         .error-msg { background: #ffebee; color: #c62828; padding: 12px; border-radius: 8px; margin-top: 15px; display: none; font-weight: bold; text-align: center; font-size: 0.95rem; }
+        
+        /* 報價單資訊區塊樣式 (移至最下方) */
+        .quote-info-box { background: #e8f5e9; padding: 20px; border-radius: 12px; margin-top: 30px; border: 1px solid #c8e6c9; }
+        .quote-info-box label { color: #2e7d32; font-size: 0.9rem; }
+        .quote-title { font-weight: bold; font-size: 1.1rem; color: #1b5e20; margin-bottom: 15px; text-align: center; border-bottom: 2px solid #a5d6a7; padding-bottom: 10px; }
+        
+        .export-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .btn-export { width: 100%; color: white; font-weight: bold; padding: 14px; border: none; border-radius: 10px; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-excel { background-color: #27ae60; }
+        .btn-pdf { background-color: #e74c3c; }
+
+        .copyright { text-align: center; margin-top: 30px; font-size: 0.8rem; color: #8e8e93; }
     </style>
 </head>
 <body>
@@ -66,23 +81,27 @@
             <input type="password" id="auth_token" placeholder="VIP888" style="border: 1px solid #0288d1;">
         </div>
 
-        <div class="form-group">
-            <label id="t_thick">1. 選擇厚度 (Thickness)</label>
-            <select id="sel_thick" onchange="populateSpecs()"></select>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-group">
+                <label id="t_thick">厚度 (Thickness)</label>
+                <input type="number" id="t" placeholder="25" step="0.1">
+            </div>
+            <div class="form-group">
+                <label id="t_height">高度 (Height)</label>
+                <input type="number" id="h" placeholder="30" step="0.1">
+            </div>
+            <div class="form-group">
+                <label id="t_fixed">固定長 (Fixed)</label>
+                <input type="number" id="f" placeholder="76" step="0.1">
+            </div>
+            <div class="form-group">
+                <label id="t_moving">移動長 (Moving)</label>
+                <input type="number" id="m" placeholder="89" step="0.1">
+            </div>
         </div>
 
-        <div class="form-group">
-            <label id="t_spec">2. 選擇長度 (固定 / 移動)</label>
-            <select id="sel_spec" onchange="clearResult()"></select>
-        </div>
-
-        <div class="form-group">
-            <label id="t_height">3. 輸入高度 (Height)</label>
-            <input type="number" id="in_height" inputmode="decimal">
-        </div>
-
-        <div class="form-group">
-            <label id="t_type">4. 類別 (Type)</label>
+        <div class="form-group full-width">
+            <label id="t_type">類別 (Type)</label>
             <select id="type">
                 <option value="TB" id="t_type_tb">機械牙板 (Machine / T-B)</option>
                 <option value="Pointed" id="t_type_pt">尖尾牙板 (Pointed Tail)</option>
@@ -90,7 +109,7 @@
         </div>
 
         <div class="form-group">
-            <label id="t_discount" style="color:#ff3b30;">5. 折扣 (Discount)</label>
+            <label id="t_discount" style="color:#ff3b30;">折扣 (Discount)</label>
             <select id="discount"></select>
         </div>
 
@@ -106,13 +125,13 @@
         <div class="var-section">
             <div class="var-row">
                 <label class="check-item"><input type="checkbox" id="opt_skh9" onchange="toggleInput('val_skh9')"> <span id="t_opt_skh9">SKH-9 (高速鋼)</span></label>
-                <div style="display:flex; align-items:center; gap:5px; color:#777; font-size:0.9rem;">
+                <div class="var-input-group">
                     x <input type="number" id="val_skh9" class="var-input" value="1.8" step="0.1" disabled>
                 </div>
             </div>
             <div class="var-row">
                 <label class="check-item"><input type="checkbox" id="opt_refurbish" onchange="toggleInput('val_refurbish')"> <span id="t_opt_ref">翻修品 (Refurbish)</span></label>
-                <div style="display:flex; align-items:center; gap:5px; color:#777; font-size:0.9rem;">
+                <div class="var-input-group">
                     x <input type="number" id="val_refurbish" class="var-input" value="0.6" step="0.1" disabled>
                 </div>
             </div>
@@ -142,65 +161,76 @@
             </div>
             <div id="result-log"></div>
         </div>
+
+        <div class="quote-info-box">
+            <div class="quote-title" id="t_quote_title">📄 報價單客戶資訊 (Quotation Info)</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group"><label id="t_quote_to">客戶名稱 (To)</label><input type="text" id="cust_name" placeholder="聯合公司"></div>
+                <div class="form-group"><label id="t_quote_attn">聯絡人 (Attn)</label><input type="text" id="cust_attn" placeholder="陳先生"></div>
+                <div class="form-group"><label id="t_quote_tel">電話 (Tel)</label><input type="text" id="cust_tel" placeholder="0868 549 896"></div>
+                <div class="form-group"><label id="t_quote_qty">數量 (Qty)</label><input type="number" id="qty" value="1" min="1"></div>
+            </div>
+            <div class="export-btns">
+                <button class="btn-export btn-excel" onclick="exportExcel()">⬇️ 匯出 Excel</button>
+                <button class="btn-export btn-pdf" onclick="exportPDF()">⬇️ 匯出 PDF</button>
+            </div>
+        </div>
+
+        <div class="copyright">© 謝智翔 u9511112@gmail.com</div>
     </div>
 
     <script>
+        // 多國語言字典
         const i18n = {
             zh: {
-                title: "搓牙板計算器", auth: "🔑 系統授權碼", thick: "1. 選擇厚度", spec: "2. 選擇長度 (固定/移動)",
-                height: "3. 輸入高度", type: "4. 類別", discount: "5. 折扣", wire: "線割費",
+                title: "搓牙板計算器", auth: "🔑 系統授權碼", thick: "厚度 (Thickness)", height: "高度 (Height)", 
+                fixed: "固定長 (Fixed)", moving: "移動長 (Moving)", type: "類別 (Type)", discount: "折扣 (Discount)", wire: "線割費 (Wire Cut)",
                 type_tb: "機械牙板 (T-B)", type_pt: "尖尾牙板 (Pointed)", wire_none: "無",
                 opt_skh9: "SKH-9 (高速鋼)", opt_ref: "翻修品",
                 o1: "機牙加深 (+20%)", o2: "三角牙/反入口 (+30%)", o3: "特殊牙型 (+50%)", o4: "牙距0.4以下 (+15%)",
                 o5: "角/方牙 (x2)", o6: "雙規格 (+30%)", o7: "雙牙/左牙 (+10%)", o8: "牙山30-48度 (+10%)",
                 o9: "四面用 (+50%)", o10: "表面處理 (+15%)", o11: "直齒42牙+ (+30%)",
-                btn: "連線計算", placeholder_h: "例如: 30", msg_waiting: "等待輸入..."
+                btn: "連線計算 (Calculate)", msg_waiting: "等待輸入...",
+                quote_title: "📄 報價單客戶資訊", quote_to: "客戶名稱 (To)", quote_attn: "聯絡人 (Attn)", quote_tel: "電話 (Tel)", quote_qty: "數量 (Qty)"
             },
             vi: {
-                title: "Máy tính Bàn chà ren", auth: "🔑 Mã bản quyền", thick: "1. Chọn độ dày", spec: "2. Chọn chiều dài (Cố định/Di động)",
-                height: "3. Nhập chiều cao", type: "4. Loại", discount: "5. Chiết khấu", wire: "Phí cắt dây",
+                title: "Máy tính Bàn chà ren", auth: "🔑 Mã bản quyền", thick: "Độ dày (Thickness)", height: "Chiều cao (Height)", 
+                fixed: "Chiều dài cố định (Fixed)", moving: "Chiều dài di động (Moving)", type: "Loại (Type)", discount: "Chiết khấu (Discount)", wire: "Phí cắt dây",
                 type_tb: "Bàn chà ren máy (T-B)", type_pt: "Bàn chà ren mũi nhọn", wire_none: "Không",
                 opt_skh9: "SKH-9 (Thép gió)", opt_ref: "Hàng phục hồi",
                 o1: "Ren sâu (+20%)", o2: "Ren tam giác (+30%)", o3: "Ren đặc biệt (+50%)", o4: "Bước ren < 0.4 (+15%)",
                 o5: "Ren vuông (x2)", o6: "Hai quy cách (+30%)", o7: "Ren trái/kép (+10%)", o8: "Góc 30-48 độ (+10%)",
                 o9: "Dùng 4 mặt (+50%)", o10: "Xử lý bề mặt (+15%)", o11: "Răng thẳng 42+ (+30%)",
-                btn: "Tính toán", placeholder_h: "VD: 30", msg_waiting: "Chờ nhập liệu..."
+                btn: "Tính toán (Calculate)", msg_waiting: "Chờ nhập liệu...",
+                quote_title: "📄 Thông tin Báo Giá", quote_to: "Khách hàng (To)", quote_attn: "Người liên hệ (Attn)", quote_tel: "Điện thoại (Tel)", quote_qty: "Số lượng (Qty)"
             },
             en: {
-                title: "Thread Rolling Die Calculator", auth: "🔑 Auth Code", thick: "1. Select Thickness", spec: "2. Select Length (Fixed/Moving)",
-                height: "3. Enter Height", type: "4. Type", discount: "5. Discount", wire: "Wire Cut Fee",
+                title: "Thread Rolling Die Calculator", auth: "🔑 Auth Code", thick: "Thickness", height: "Height", 
+                fixed: "Fixed Length", moving: "Moving Length", type: "Type", discount: "Discount", wire: "Wire Cut Fee",
                 type_tb: "Machine Die (T-B)", type_pt: "Pointed Tail Die", wire_none: "None",
                 opt_skh9: "SKH-9 (High-Speed)", opt_ref: "Refurbished",
                 o1: "Deep Thread (+20%)", o2: "Triangle Thread (+30%)", o3: "Special Thread (+50%)", o4: "Pitch < 0.4 (+15%)",
                 o5: "Square Thread (x2)", o6: "Dual Specs (+30%)", o7: "Left/Double Thread (+10%)", o8: "Angle 30-48 (+10%)",
                 o9: "4-Face Use (+50%)", o10: "Surface Treat (+15%)", o11: "Straight 42+ (+30%)",
-                btn: "Calculate", placeholder_h: "e.g. 30", msg_waiting: "Waiting for input..."
+                btn: "Calculate", msg_waiting: "Waiting for input...",
+                quote_title: "📄 Quotation Info", quote_to: "Customer (To)", quote_attn: "Contact (Attn)", quote_tel: "Tel", quote_qty: "Qty"
             }
         };
 
-        const availableSpecs = [
-            "19.0_51.0_64.0", "20.0_65.0_80.0", "25.0_75.0_90.0", "25.0_90.0_105.0",
-            "25.0_100.0_115.0", "25.0_108.0_127.0", "25.0_127.0_140.0", "25.0_150.0_165.0",
-            "35.0_190.0_215.0", "38.0_230.0_265.0", "43.0_290.0_330.0", "50.0_290.0_330.0",
-            "50.0_380.0_420.0", "50.0_400.0_450.0"
-        ];
+        window.lastCalcData = null;
 
-        // 網頁啟動時執行的動作
         function initApp() {
             changeLanguage();
             changeCurrency();
             populateDiscount();
-            populateThick();
 
-            // 🌟 讀取瀏覽器記憶的密碼
             const savedToken = localStorage.getItem('threadCalcToken');
             if (savedToken) {
                 document.getElementById('auth_token').value = savedToken;
-                verifyToken(savedToken); // 自動去後端查到期日
+                verifyToken(savedToken); 
             }
         }
 
-        // 🌟 去後端驗證密碼與取得日期的函數
         async function verifyToken(token) {
             try {
                 const response = await fetch('/api/verify', {
@@ -214,13 +244,10 @@
                     badge.style.display = 'block';
                     badge.innerText = `⏳ 到期: ${result.expireDate}`;
                 } else {
-                    // 如果密碼過期或被管理員刪除，就把手機的記憶清空
                     localStorage.removeItem('threadCalcToken');
                     badge.style.display = 'none';
                 }
-            } catch (e) {
-                console.log("無法自動驗證授權碼狀態");
-            }
+            } catch (e) { console.log("無法自動驗證"); }
         }
 
         function changeLanguage() {
@@ -230,8 +257,9 @@
             document.getElementById('t_title').innerText = text.title;
             document.getElementById('t_auth').innerText = text.auth;
             document.getElementById('t_thick').innerText = text.thick;
-            document.getElementById('t_spec').innerText = text.spec;
             document.getElementById('t_height').innerText = text.height;
+            document.getElementById('t_fixed').innerText = text.fixed;
+            document.getElementById('t_moving').innerText = text.moving;
             document.getElementById('t_type').innerText = text.type;
             document.getElementById('t_discount').innerText = text.discount;
             document.getElementById('t_wire').innerText = text.wire;
@@ -245,7 +273,14 @@
             for(let i=1; i<=11; i++) { document.getElementById('t_o'+i).innerText = text['o'+i]; }
             
             document.getElementById('t_btn').innerText = text.btn;
-            document.getElementById('in_height').placeholder = text.placeholder_h;
+            
+            // 報價單翻譯
+            document.getElementById('t_quote_title').innerText = text.quote_title;
+            document.getElementById('t_quote_to').innerText = text.quote_to;
+            document.getElementById('t_quote_attn').innerText = text.quote_attn;
+            document.getElementById('t_quote_tel').innerText = text.quote_tel;
+            document.getElementById('t_quote_qty').innerText = text.quote_qty;
+
             if(document.getElementById('final-price').innerText === "0") {
                 document.getElementById('result-log').innerText = text.msg_waiting;
             }
@@ -261,7 +296,6 @@
             } else if (cur === 'TWD' || cur === 'USD') {
                 wireSel.options[1].value = "170"; wireSel.options[2].value = "340";
             }
-            clearResult();
         }
 
         function toggleInput(id) {
@@ -278,57 +312,29 @@
             }
         }
 
-        function populateThick() {
-            const sel = document.getElementById('sel_thick');
-            sel.innerHTML = '<option value="">...</option>';
-            const thicks = new Set(availableSpecs.map(key => key.split('_')[0]));
-            Array.from(thicks).sort((a, b) => parseFloat(a) - parseFloat(b)).forEach(t => sel.add(new Option(t + " mm", t)));
-        }
-
-        function populateSpecs() {
-            const thick = document.getElementById('sel_thick').value;
-            const sel = document.getElementById('sel_spec');
-            sel.innerHTML = '<option value="">...</option>';
-            if (!thick) return;
-            availableSpecs.filter(k => k.startsWith(thick + "_")).forEach(key => {
-                const parts = key.split('_');
-                sel.add(new Option(`固定: ${parts[1]} / 移動: ${parts[2]}`, key));
-            });
-            clearResult();
-        }
-
-        function clearResult() {
-            document.getElementById('final-price').innerText = "0";
-            document.getElementById('result-log').innerText = i18n[document.getElementById('lang').value].msg_waiting;
-            document.getElementById('error-box').style.display = 'none';
-        }
-
         async function calculate() {
             const token = document.getElementById('auth_token').value;
             const errorBox = document.getElementById('error-box');
             const priceDisplay = document.getElementById('final-price');
             const logArea = document.getElementById('result-log');
-            
-            const specKey = document.getElementById('sel_spec').value;
-            const hInput = document.getElementById('in_height').value;
 
-            if(!token) { errorBox.style.display = 'block'; errorBox.innerText = "⛔ 請輸入授權碼 (Auth Code)"; return; }
-            if (!specKey || !hInput) { errorBox.style.display = 'block'; errorBox.innerText = "請確認規格填寫完整"; return; }
-
-            const [t, f, m] = specKey.split('_').map(Number);
-            const currency = document.getElementById('currency').value;
-            let wireVal = parseFloat(document.getElementById('wire').value) || 0;
+            if(!token) { errorBox.style.display = 'block'; errorBox.innerText = "⛔ 請先輸入上方的系統授權碼！"; return; }
 
             const payload = {
-                t: t, h: parseFloat(hInput), f: f, m: m,
+                t: parseFloat(document.getElementById('t').value),
+                h: parseFloat(document.getElementById('h').value),
+                f: parseFloat(document.getElementById('f').value),
+                m: parseFloat(document.getElementById('m').value),
                 type: document.getElementById('type').value,
-                currency: currency,
-                wireFee: wireVal,
+                currency: document.getElementById('currency').value,
+                wireFee: parseFloat(document.getElementById('wire').value) || 0,
                 discount: parseFloat(document.getElementById('discount').value) || 0,
+                
                 multipliers: {
                     skh9: parseFloat(document.getElementById('val_skh9').value) || 1.8,
                     refurbish: parseFloat(document.getElementById('val_refurbish').value) || 0.6
                 },
+                
                 options: {
                     skh9: document.getElementById('opt_skh9').checked,
                     refurbish: document.getElementById('opt_refurbish').checked,
@@ -346,7 +352,12 @@
                 }
             };
 
+            if (isNaN(payload.t) || isNaN(payload.h) || isNaN(payload.f) || isNaN(payload.m)) {
+                errorBox.style.display = 'block'; errorBox.innerText = "請填寫所有規格 (厚度, 高度, 固定長, 移動長)"; return;
+            }
+
             priceDisplay.innerText = "...";
+            logArea.innerText = "📡 正在連線至雲端伺服器驗證授權...";
             errorBox.style.display = 'none';
 
             try {
@@ -362,23 +373,135 @@
                     priceDisplay.innerText = result.finalPrice.toLocaleString();
                     logArea.innerText = result.logs.join('\n');
                     
-                    // 🌟 計算成功！代表密碼正確，將密碼存入手機記憶體中
                     localStorage.setItem('threadCalcToken', token);
-                    
-                    // 同步更新右上角的標籤
                     const badge = document.getElementById('expiry-badge');
                     badge.style.display = 'block';
                     badge.innerText = `⏳ 到期: ${result.expireDate}`;
-
+                    
+                    window.lastCalcData = {
+                        t: payload.t, h: payload.h, f: payload.f, m: payload.m,
+                        type: payload.type, skh9: payload.options.skh9,
+                        unitPrice: result.finalPrice, logs: result.logs, currency: payload.currency
+                    };
                 } else {
-                    errorBox.style.display = 'block';
-                    errorBox.innerText = result.error;
-                    priceDisplay.innerText = "0";
+                    errorBox.style.display = 'block'; errorBox.innerText = result.error;
+                    priceDisplay.innerText = "0"; logArea.innerText = "計算失敗";
+                    window.lastCalcData = null;
                 }
             } catch (error) {
-                errorBox.style.display = 'block';
-                errorBox.innerText = "無法連線至伺服器。 Server Error.";
+                errorBox.style.display = 'block'; errorBox.innerText = "無法連線至伺服器，請檢查網路狀態。";
+                window.lastCalcData = null;
             }
+        }
+
+        function getQuoteDetails() {
+            if (!window.lastCalcData) {
+                alert("請先成功進行一次「連線計算」後，再匯出報價單！");
+                return null;
+            }
+            const d = window.lastCalcData;
+            const typeLabel = d.type === 'Pointed' ? '尖尾牙板' : '機械牙板';
+            const materialLabel = d.skh9 ? 'SKH-9' : 'H9';
+            return {
+                d: d,
+                custName: document.getElementById('cust_name').value || '未填寫客戶',
+                custAttn: document.getElementById('cust_attn').value || '',
+                custTel: document.getElementById('cust_tel').value || '',
+                qty: parseInt(document.getElementById('qty').value) || 1,
+                dateStr: new Date().toISOString().split('T')[0].replace(/-/g, '/'),
+                specStr: `牙板-BÀN CÁN\n${typeLabel}\n${d.t}*${d.h}*${d.f}/${d.m}`,
+                material: materialLabel,
+                currency: d.currency
+            };
+        }
+
+        function exportExcel() {
+            const quote = getQuoteDetails();
+            if (!quote) return;
+
+            const wb = XLSX.utils.book_new();
+            const ws_data = [
+                ["精斌責任有限公司"],
+                ["CÔNG TY TNHH HỢP KIM BƯỚC NHẢY"],
+                ["Đ/C: Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh"],
+                ["Tel: 0274-3669503-4", "", "", "Fax : 0274 - 3557129"],
+                [],
+                ["To   :", quote.custName],
+                ["Attn :", quote.custAttn],
+                ["Tel  :", quote.custTel],
+                [],
+                ["", "", "", "報價單"],
+                ["", "", "", "BẢNG BÁO GIÁ"],
+                [],
+                ["", "", "", "", "", "", "日期/ngày tháng：" + quote.dateStr],
+                ["STT\n序號", "Tên sản phẩm / Quy cách \n品名/尺寸", "", "Đvt\n單位", "Chất Liệu\n材質", "數量", `單價\n(${quote.currency})`, `金額\n(${quote.currency})`, "Ghi chú\n備註"],
+                [1, quote.specStr, "", "组", quote.material, quote.qty, quote.d.unitPrice, quote.d.unitPrice * quote.qty, quote.d.logs.join('\n')]
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, "Báo Giá");
+            XLSX.writeFile(wb, `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.xlsx`);
+        }
+
+        function exportPDF() {
+            const quote = getQuoteDetails();
+            if (!quote) return;
+
+            const element = document.createElement('div');
+            element.innerHTML = `
+                <div style="padding: 40px; font-family: sans-serif; color: #000; background: #fff; line-height: 1.5;">
+                    <h3 style="margin:0;">精斌責任有限公司</h3>
+                    <h4 style="margin:0;">CÔNG TY TNHH HỢP KIM BƯỚC NHẢY</h4>
+                    <p style="font-size: 13px; margin: 8px 0;">Đ/C: Lô CN14, Ô Số 16, Đường số 4, KCN Sóng Thần 3, Phường Bình Dương, TP.Hồ Chí Minh</p>
+                    <p style="font-size: 13px; margin: 0 0 30px 0;">Tel: 0274-3669503-4 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Fax : 0274 - 3557129</p>
+                    
+                    <table style="width: 100%; border: none; font-size: 15px; margin-bottom: 20px;">
+                        <tr><td style="width: 80px; font-weight:bold;">To:</td><td>${quote.custName}</td></tr>
+                        <tr><td style="font-weight:bold;">Attn:</td><td>${quote.custAttn}</td></tr>
+                        <tr><td style="font-weight:bold;">Tel:</td><td>${quote.custTel}</td></tr>
+                    </table>
+
+                    <h2 style="text-align: center; margin: 0 0 5px 0;">報價單</h2>
+                    <h3 style="text-align: center; margin: 0 0 20px 0;">BẢNG BÁO GIÁ</h3>
+                    
+                    <p style="text-align: right; font-size: 13px;">日期/ngày tháng: ${quote.dateStr}</p>
+                    
+                    <table border="1" style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: center; margin-top: 10px;">
+                        <thead style="background: #f0f0f0;">
+                            <tr>
+                                <th style="padding: 8px;">STT<br>序號</th>
+                                <th style="padding: 8px;">Tên sản phẩm / Quy cách<br>品名/尺寸</th>
+                                <th style="padding: 8px;">Đvt<br>單位</th>
+                                <th style="padding: 8px;">Chất Liệu<br>材質</th>
+                                <th style="padding: 8px;">數量</th>
+                                <th style="padding: 8px;">單價<br>(${quote.currency})</th>
+                                <th style="padding: 8px;">金額<br>(${quote.currency})</th>
+                                <th style="padding: 8px; width: 25%;">Ghi chú<br>備註</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding: 8px;">1.0</td>
+                                <td style="padding: 8px; text-align: left; white-space: pre-wrap;">${quote.specStr}</td>
+                                <td style="padding: 8px;">组</td>
+                                <td style="padding: 8px;">${quote.material}</td>
+                                <td style="padding: 8px;">${quote.qty}</td>
+                                <td style="padding: 8px;">${quote.d.unitPrice.toLocaleString()}</td>
+                                <td style="padding: 8px;">${(quote.d.unitPrice * quote.qty).toLocaleString()}</td>
+                                <td style="padding: 8px; text-align: left; white-space: pre-wrap; font-size: 11px;">${quote.d.logs.join('\n')}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            html2pdf().from(element).set({
+                margin: 10,
+                filename: `報價單_${quote.custName}_${quote.dateStr.replace(/\//g, '')}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).save();
         }
 
         initApp();
